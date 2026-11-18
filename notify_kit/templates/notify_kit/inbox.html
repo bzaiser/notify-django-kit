@@ -1,0 +1,41 @@
+{% extends "design_studio/layouts/base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Benachrichtigungen" %}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="fw-bold mb-0"><i class="bi bi-bell me-2"></i>{% trans "Benachrichtigungen" %}</h4>
+    <form method="post" action="{% url 'notify_kit:mark_all_read' %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-sm btn-outline-primary rounded-pill px-3">
+            <i class="bi bi-check2-all me-1"></i>{% trans "Alle als gelesen markieren" %}
+        </button>
+    </form>
+</div>
+
+<div class="card shadow-sm">
+    <div class="list-group list-group-flush">
+        {% for item in notifications %}
+        <div class="list-group-item d-flex justify-content-between align-items-start gap-3 {% if not item.is_read %}fw-semibold{% else %}opacity-75{% endif %}">
+            <div>
+                <span class="badge bg-{{ item.level }} me-2">{{ item.level|upper }}</span>
+                <span>{{ item.title }}</span>
+                {% if item.message %}
+                <div class="small text-muted fw-normal mt-1">{{ item.message }}</div>
+                {% endif %}
+                <div class="small text-muted fw-normal mt-1">{{ item.created_at }}</div>
+            </div>
+            <form method="post" action="{% url 'notify_kit:mark_read' item.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-outline-secondary rounded-pill">
+                    {% if item.link %}{% trans "Öffnen" %}{% else %}{% trans "Gelesen" %}{% endif %}
+                </button>
+            </form>
+        </div>
+        {% empty %}
+        <div class="list-group-item text-center text-muted py-4">{% trans "Keine Benachrichtigungen vorhanden." %}</div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
