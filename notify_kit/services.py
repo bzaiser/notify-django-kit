@@ -6,7 +6,8 @@ from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 
-from .models import Notification
+from .models import Notification, NotificationPreference
+from .registry import get_topic
 
 
 def send_themed_email(to_emails, subject, title, message, link="", primary_color="#0d6efd"):
@@ -53,20 +54,48 @@ def send_webhook(url: str, title: str, message: str = "", level: str = "info", t
         return 200 <= resp.status < 300
 
 
-def notify(user, title: str, message: str = "", level: str = "info", link: str = "", email: bool = False, webhook_url: str = ""):
+def is_topic_enabled_for_user(user, topic_key: str) -> bool:
+    if not topic_key or user is None:
+        return True
+    topic_meta = get_topic(topic_key)
+    pref = NotificationPreference.objects.filter(user=user).first()
+    if pref is None:
+        return bool(topic_meta.get("default_enabled", True)) if topic_meta else True
+    return topic_key not in set(pref.disabled_topics_json or [])
+
+
+def notify(
+    user,
+    title: str,
+    message: str = "",
+    level: str = "info",
+    link: str = "",
+    email: bool = False,
+    webhook_url: str = "",
+    topic: str = "",
+    body: str = "",
+):
+    clean_topic = (topic or "").strip()[:80]
+    if clean_topic and not is_topic_enabled_for_user(user, clean_topic):
+        return None
+    text = message if message else body
     notif = Notification.objects.create(
         user=user,
         title=title[:140],
-        message=message,
+        message=text,
         level=level if level in ("info", "success", "warning", "danger") else "info",
+        topic=clean_topic,
         link=link[:255],
     )
     if email and getattr(user, "email", ""):
-        send_themed_email(user.email, title, title, message, link=link)
+        send_themed_email(user.email, title, title, text, link=link)
     target_hook = webhook_url or getattr(settings, "NOTIFY_KIT_WEBHOOK_URL", "")
     if target_hook:
         try:
-            send_webhook(target_hook, title, message, level=level)
+            send_webhook(target_hook, title, text, level=level)
         except Exception:
             pass
     return notif
+
+
+send_notification = notify

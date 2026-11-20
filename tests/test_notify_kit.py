@@ -84,6 +84,46 @@ class NotifyKitTests(TestCase):
         self.client.post(f"/notifications/read/{n.pk}/")
         self.assertEqual(self.client.get("/notifications/unread.json").json()["unread_count"], 0)
 
+    def test_topic_registry_and_user_opt_out(self):
+        from notify_kit.registry import get_registered_topics, register_notification_topic
+        from notify_kit.services import send_notification
+
+        register_notification_topic(
+            key="cal.reminder",
+            label="Kalender-Erinnerungen",
+            description="Erinnerungen vor Terminen",
+            icon="bi-alarm",
+        )
+        register_notification_topic(
+            key="ops.update_available",
+            label="GitHub-Updates verfügbar",
+            staff_only=True,
+        )
+
+        # Non-staff user only sees non-staff topics
+        topics_bob = [t["key"] for t in get_registered_topics(self.user)]
+        self.assertIn("cal.reminder", topics_bob)
+        self.assertNotIn("ops.update_available", topics_bob)
+
+        # Settings tab renders topic
+        settings_resp = self.client.get("/notifications/?tab=settings")
+        self.assertEqual(settings_resp.status_code, 200)
+        self.assertIn("Kalender-Erinnerungen", settings_resp.content.decode("utf-8"))
+
+        # Opt out of cal.reminder
+        pref_resp = self.client.post("/notifications/preferences/", {"enabled_topics": []})
+        self.assertEqual(pref_resp.status_code, 302)
+
+        skipped = send_notification(self.user, "Termin", body="In 15 Min", topic="cal.reminder")
+        self.assertIsNone(skipped)
+
+        # Opt back in
+        self.client.post("/notifications/preferences/", {"enabled_topics": ["cal.reminder"]})
+        delivered = send_notification(self.user, "Termin", body="In 15 Min", topic="cal.reminder")
+        self.assertIsNotNone(delivered)
+        self.assertEqual(delivered.topic, "cal.reminder")
+        self.assertEqual(delivered.message, "In 15 Min")
+
 
 if __name__ == "__main__":
     from django.test.runner import DiscoverRunner
