@@ -7,12 +7,20 @@
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
     <h4 class="fw-bold mb-0"><i class="bi bi-bell me-2"></i>{% trans "Benachrichtigungen" %}</h4>
     {% if active_tab != "settings" %}
-    <form method="post" action="{% url 'notify_kit:mark_all_read' %}">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-sm btn-outline-primary rounded-pill px-3">
-            <i class="bi bi-check2-all me-1"></i>{% trans "Alle als gelesen markieren" %}
-        </button>
-    </form>
+    <div class="d-flex flex-wrap gap-2">
+        <form method="post" action="{% url 'notify_kit:mark_all_read' %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-sm btn-outline-primary rounded-pill px-3">
+                <i class="bi bi-check2-all me-1"></i>{% trans "Alle als gelesen markieren" %}
+            </button>
+        </form>
+        <form method="post" action="{% url 'notify_kit:delete_read' %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3">
+                <i class="bi bi-trash3 me-1"></i>{% trans "Alle gelesenen löschen" %}
+            </button>
+        </form>
+    </div>
     {% endif %}
 </div>
 
@@ -90,12 +98,18 @@
                 {% endif %}
                 <div class="small text-muted fw-normal mt-1">{{ item.created_at }}</div>
             </div>
-            <form method="post" action="{% url 'notify_kit:mark_read' item.pk %}">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-sm btn-outline-secondary rounded-pill">
-                    {% if item.link %}{% trans "Öffnen" %}{% else %}{% trans "Gelesen" %}{% endif %}
-                </button>
-            </form>
+            <div class="d-flex align-items-center gap-1 flex-shrink-0">
+                <form method="post" action="{% url 'notify_kit:mark_read' item.pk %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-outline-secondary rounded-pill">
+                        {% if item.link %}{% trans "Öffnen" %}{% else %}{% trans "Gelesen" %}{% endif %}
+                    </button>
+                </form>
+                <form method="post" action="{% url 'notify_kit:delete' item.pk %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill" title="{% trans 'Löschen' %}"><i class="bi bi-trash3"></i></button>
+                </form>
+            </div>
         </div>
         {% empty %}
         <div class="list-group-item text-center text-muted py-4">{% trans "Keine Benachrichtigungen vorhanden." %}</div>

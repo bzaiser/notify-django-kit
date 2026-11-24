@@ -76,6 +76,21 @@ def mark_all_read_view(request):
 
 
 @login_required
+@require_POST
+def delete_notification_view(request, pk):
+    item = get_object_or_404(Notification, pk=pk, user=request.user)
+    item.delete()
+    return redirect("notify_kit:inbox")
+
+
+@login_required
+@require_POST
+def delete_read_notifications_view(request):
+    Notification.objects.filter(user=request.user, is_read=True).delete()
+    return redirect("notify_kit:inbox")
+
+
+@login_required
 def unread_json_view(request):
     qs = Notification.objects.filter(user=request.user, is_read=False)
     return JsonResponse({
