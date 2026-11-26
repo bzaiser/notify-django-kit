@@ -60,10 +60,14 @@ def preferences_view(request):
 @login_required
 @require_POST
 def mark_read_view(request, pk):
+    from django.utils.http import url_has_allowed_host_and_scheme
+
     item = get_object_or_404(Notification, pk=pk, user=request.user)
     item.is_read = True
     item.save(update_fields=["is_read"])
-    if item.link:
+    if item.link and url_has_allowed_host_and_scheme(
+        item.link, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
         return redirect(item.link)
     return redirect("notify_kit:inbox")
 

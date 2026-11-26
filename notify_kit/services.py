@@ -36,16 +36,43 @@ def send_themed_email(to_emails, subject, title, message, link="", primary_color
     return msg.send(fail_silently=False)
 
 
-def send_webhook(url: str, title: str, message: str = "", level: str = "info", timeout: int = 5) -> bool:
-    if not url:
+def _is_safe_webhook_url(url: str) -> bool:
+    import ipaddress
+    import socket
+    from urllib.parse import urlparse
+
+    parsed = urlparse((url or "").strip())
+    allowed_schemes = ("https", "http") if getattr(settings, "NOTIFY_KIT_ALLOW_HTTP_WEBHOOKS", True) else ("https",)
+    if parsed.scheme not in allowed_schemes or not parsed.hostname:
         return False
+    if getattr(settings, "NOTIFY_KIT_ALLOW_PRIVATE_WEBHOOKS", False):
+        return True
+    try:
+        infos = socket.getaddrinfo(parsed.hostname, None)
+    except OSError:
+        return False
+    for info in infos:
+        ip_str = info[4][0]
+        try:
+            ip_obj = ipaddress.ip_address(ip_str)
+            if ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_link_local or ip_obj.is_reserved or ip_obj.is_multicast:
+                return False
+        except ValueError:
+            return False
+    return True
+
+
+def send_webhook(url: str, title: str, message: str = "", level: str = "info", timeout: int = 5) -> bool:
+    if not url or not _is_safe_webhook_url(url):
+        return False
+    safe_title = (title or "").replace("\r", " ").replace("\n", " ")[:100].encode("latin-1", "ignore").decode("latin-1")
     payload = json.dumps({"title": title, "message": message, "level": level}).encode("utf-8")
     req = urllib.request.Request(
         url,
         data=payload,
         headers={
             "Content-Type": "application/json",
-            "Title": title[:100],
+            "Title": safe_title,
             "Priority": "high" if level == "danger" else "default",
         },
         method="POST",
@@ -88,7 +115,10 @@ def notify(
         link=link[:255],
     )
     if email and getattr(user, "email", ""):
-        send_themed_email(user.email, title, title, text, link=link)
+        try:
+            send_themed_email(user.email, title, title, text, link=link)
+        except Exception:
+            pass
     target_hook = webhook_url or getattr(settings, "NOTIFY_KIT_WEBHOOK_URL", "")
     if target_hook:
         try:
